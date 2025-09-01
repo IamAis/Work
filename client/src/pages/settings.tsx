@@ -14,6 +14,9 @@ import { dbOps } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { insertCoachProfileSchema, type InsertCoachProfile } from '@shared/schema';
 import { useRef } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { usePremium } from '@/hooks/use-premium';
+import { PremiumDialog } from '@/components/premium-dialog';
 import { processImageForUpload } from '@/lib/image-utils';
 
 export default function Settings() {
@@ -21,6 +24,9 @@ export default function Settings() {
   const createCoachProfile = useCreateCoachProfile();
   const updateCoachProfile = useUpdateCoachProfile();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { canAccess } = usePremium();
+  const [showPremiumDialog, setShowPremiumDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [backupStats, setBackupStats] = useState<{
@@ -43,7 +49,8 @@ export default function Settings() {
       exportPath: coachProfile?.exportPath || '',
       pdfLineColor: coachProfile?.pdfLineColor || '#000000',
       pdfTextColor: coachProfile?.pdfTextColor || '#4F46E5',
-      showWatermark: coachProfile?.showWatermark ?? true
+      showWatermark: coachProfile?.showWatermark ?? true,
+      useWorkoutNameAsTitle: coachProfile?.useWorkoutNameAsTitle ?? false
     }
   });
 
@@ -62,7 +69,8 @@ export default function Settings() {
         exportPath: coachProfile.exportPath || '',
         pdfLineColor: coachProfile.pdfLineColor || '#000000',
         pdfTextColor: coachProfile.pdfTextColor || '#4F46E5',
-        showWatermark: coachProfile.showWatermark ?? true
+        showWatermark: coachProfile.showWatermark ?? true,
+        useWorkoutNameAsTitle: coachProfile.useWorkoutNameAsTitle ?? false
       });
     }
   }, [coachProfile, form]);
@@ -73,6 +81,11 @@ export default function Settings() {
   }, []);
 
   const handleSaveProfile = async (data: InsertCoachProfile) => {
+    // Verifica se l'utente può modificare le impostazioni Coach
+    if (!canAccess('coach-settings')) {
+      setShowPremiumDialog(true);
+      return;
+    }
     try {
       if (coachProfile) {
         // Aggiorna direttamente nel database locale
@@ -90,8 +103,8 @@ export default function Settings() {
         });
       }
       
-      // Ricarica i dati senza refreshare la pagina
-      // Il database locale manterrà le modifiche persistenti
+      // Ricarica la pagina automaticamente dopo il salvataggio
+      window.location.reload();
     } catch (error) {
       console.error('Errore nel salvataggio:', error);
       toast({
@@ -140,6 +153,7 @@ export default function Settings() {
       });
     }
   };
+
 
   const handleImport = async (file: File) => {
     try {
@@ -192,7 +206,13 @@ export default function Settings() {
   };
 
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-mobile-nav">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-mobile-nav">
+      {/* Premium Dialog */}
+      <PremiumDialog 
+        open={showPremiumDialog} 
+        onOpenChange={setShowPremiumDialog} 
+        feature="coach-settings" 
+      />
       <div className="mb-8 md:mb-12">
         <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
           Impostazioni
@@ -458,7 +478,31 @@ export default function Settings() {
                       />
                     </div>
                     
-                    <div className="mt-4">
+                    <div className="mt-4 space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="useWorkoutNameAsTitle"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 space-y-0">
+                            <div className="space-y-0.5">
+                              <FormLabel className="flex items-center gap-2">
+                                <Type size={14} className="text-purple-500" />
+                                Usa Nome Scheda come Titolo
+                              </FormLabel>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Se attivato, usa il nome della scheda al posto di "SCHEDA DI ALLENAMENTO" nei PDF
+                              </p>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      
                       <FormField
                         control={form.control}
                         name="showWatermark"
@@ -525,7 +569,7 @@ export default function Settings() {
           <CardContent className="space-y-6">
             {/* Backup Stats */}
             {backupStats && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {backupStats.workoutsCount}
@@ -539,6 +583,12 @@ export default function Settings() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Clienti</p>
                 </div>
                 <div className="text-center">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {backupStats.exerciseGlossaryCount}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Esercizi</p>
+                </div>
+                <div className="text-center">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {backupStats.lastBackup 
                       ? `Ultimo backup: ${backupStats.lastBackup.toLocaleDateString('it-IT')}`
@@ -549,17 +599,17 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Backup Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Azioni Backup/Cloud */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Button
                 onClick={handleBackup}
-                className="h-auto p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 border border-emerald-200 dark:border-emerald-700 hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-800/40 dark:hover:to-teal-800/40 text-left justify-start"
+                className="h-auto p-6 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 border border-emerald-200 dark:border-emerald-700 hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-800/40 dark:hover:to-teal-800/40 text-left justify-start min-h-[100px] w-full"
                 variant="ghost"
               >
                 <div className="flex items-center w-full">
-                  <Download className="text-emerald-500 mr-3" size={20} />
+                  <Download className="text-emerald-500 mr-4" size={24} />
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white text-sm">
+                    <p className="font-medium text-gray-900 dark:text-white text-base">
                       Esporta Backup
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -571,13 +621,13 @@ export default function Settings() {
 
               <Button
                 onClick={() => fileInputRef.current?.click()}
-                className="h-auto p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 border border-indigo-200 dark:border-indigo-700 hover:from-indigo-100 hover:to-purple-100 dark:hover:from-indigo-800/40 dark:hover:to-purple-800/40 text-left justify-start"
+                className="h-auto p-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 border border-indigo-200 dark:border-indigo-700 hover:from-indigo-100 hover:to-purple-100 dark:hover:from-indigo-800/40 dark:hover:to-purple-800/40 text-left justify-start min-h-[100px] w-full"
                 variant="ghost"
               >
                 <div className="flex items-center w-full">
-                  <Upload className="text-indigo-500 mr-3" size={20} />
+                  <Upload className="text-indigo-500 mr-4" size={24} />
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white text-sm">
+                    <p className="font-medium text-gray-900 dark:text-white text-base">
                       Importa Backup
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -587,15 +637,86 @@ export default function Settings() {
                 </div>
               </Button>
 
+              {/* Carica in Cloud (sovrascrive) */}
               <Button
-                onClick={handleClearData}
-                className="h-auto p-4 bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/30 dark:to-pink-900/30 border border-red-200 dark:border-red-700 hover:from-red-100 hover:to-pink-100 dark:hover:from-red-800/40 dark:hover:to-pink-800/40 text-left justify-start"
+                onClick={async () => {
+                  // Verifica se l'utente può accedere alla funzionalità premium
+                  if (!canAccess('coach-settings')) {
+                    setShowPremiumDialog(true);
+                    return;
+                  }
+                  
+                  if (!window.confirm('Il backup remoto verrà reimpiazzato con i dati attuali, è consigliato prima caricare i dati dal cloud. Procedere?')) return;
+                  try {
+                    await BackupManager.exportToSupabaseStorage();
+                    const stats = await BackupManager.getBackupStats();
+                    setBackupStats(stats);
+                    toast({ title: 'Caricato in cloud', description: 'Backup remoto aggiornato.' });
+                  } catch (error) {
+                    toast({ title: 'Errore', description: 'Impossibile caricare in cloud', variant: 'destructive' });
+                  }
+                }}
+                className="h-auto p-6 text-left justify-start rounded-xl relative bg-sky-100 dark:bg-sky-900/30 border-2 border-yellow-500 hover:bg-sky-200 dark:hover:bg-sky-800/40 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 min-h-[100px] w-full"
                 variant="ghost"
               >
                 <div className="flex items-center w-full">
-                  <Trash2 className="text-red-500 mr-3" size={20} />
+                  <Upload className="text-sky-700 dark:text-sky-300 mr-4" size={24} />
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white text-sm">
+                    <p className="font-semibold text-gray-900 dark:text-white text-base">
+                      Carica in Cloud
+                    </p>
+                    <p className="text-xs text-gray-700 dark:text-gray-300">
+                      Sostituisci i dati nel cloud
+                    </p>
+                  </div>
+                </div>
+              </Button>
+
+              {/* Carica dal Cloud (sostituisce) */}
+              <Button
+                onClick={async () => {
+                  // Verifica se l'utente può accedere alla funzionalità premium
+                  if (!canAccess('coach-settings')) {
+                    setShowPremiumDialog(true);
+                    return;
+                  }
+                  
+                  if (!window.confirm('I dati locali verranno completamente sostituiti con quelli dal cloud. Procedere?')) return;
+                  try {
+                    await BackupManager.mergeFromSupabaseStorage();
+                    const stats = await BackupManager.getBackupStats();
+                    setBackupStats(stats);
+                    toast({ title: 'Dati sostituiti', description: 'Dati locali sostituiti con quelli del cloud.' });
+                    setTimeout(() => window.location.reload(), 500);
+                  } catch (error) {
+                    toast({ title: 'Errore', description: 'Impossibile caricare dal cloud', variant: 'destructive' });
+                  }
+                }}
+                className="h-auto p-6 text-left justify-start rounded-xl relative bg-sky-100 dark:bg-sky-900/30 border-2 border-yellow-500 hover:bg-sky-200 dark:hover:bg-sky-800/40 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 min-h-[100px] w-full"
+                variant="ghost"
+              >
+                <div className="flex items-center w-full">
+                  <Download className="text-sky-700 dark:text-sky-300 mr-4" size={24} />
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white text-base">
+                      Carica dal Cloud
+                    </p>
+                    <p className="text-xs text-gray-700 dark:text-gray-300">
+                      Importa i dati remoti
+                    </p>
+                  </div>
+                </div>
+              </Button>
+
+              <Button
+                onClick={handleClearData}
+                className="h-auto p-6 bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/30 dark:to-pink-900/30 border border-red-200 dark:border-red-700 hover:from-red-100 hover:to-pink-100 dark:hover:from-red-800/40 dark:hover:to-pink-800/40 text-left justify-start min-h-[100px] w-full"
+                variant="ghost"
+              >
+                <div className="flex items-center w-full">
+                  <Trash2 className="text-red-500 mr-4" size={24} />
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white text-base">
                       Cancella Tutto
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -605,6 +726,8 @@ export default function Settings() {
                 </div>
               </Button>
             </div>
+
+            {/* Pulsanti cloud espliciti: nessun salvataggio automatico */}
           </CardContent>
         </Card>
       </div>

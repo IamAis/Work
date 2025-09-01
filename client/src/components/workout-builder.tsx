@@ -90,6 +90,7 @@ export function WorkoutBuilder({ existingWorkout, onSuccess }: WorkoutBuilderPro
     const newWeek: Week = {
       id: crypto.randomUUID(),
       number: weeks.length + 1,
+      name: `SETTIMANA ${weeks.length + 1}`, // Nome default customizzabile
       days: [
         {
           id: crypto.randomUUID(),
@@ -116,13 +117,13 @@ export function WorkoutBuilder({ existingWorkout, onSuccess }: WorkoutBuilderPro
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       if (existingWorkout) {
-        // Update existing workout
+        // Update existing workout - forza l'uso delle settimane attuali
         await updateWorkout.mutateAsync({
           id: existingWorkout.id,
           updates: {
             ...data,
             coachName: coachProfile?.name || data.coachName, // Usa il coach dalle impostazioni
-            weeks,
+            weeks: weeks, // Forza l'uso dello stato attuale delle settimane
             updatedAt: new Date()
           }
         });
@@ -131,12 +132,18 @@ export function WorkoutBuilder({ existingWorkout, onSuccess }: WorkoutBuilderPro
           title: "Scheda aggiornata",
           description: "Le modifiche sono state salvate con successo"
         });
+        
+        // Hard reset del form dopo l'aggiornamento
+        setTimeout(() => {
+          onSuccess?.();
+        }, 100);
+        
       } else {
-        // Create new workout
+        // Create new workout - forza l'uso delle settimane attuali
         const workoutData: InsertWorkout = {
           ...data,
           coachName: coachProfile?.name || data.coachName, // Usa il coach dalle impostazioni
-          weeks
+          weeks: weeks // Forza l'uso dello stato attuale delle settimane
         };
         
         await createWorkout.mutateAsync(workoutData);
@@ -149,9 +156,8 @@ export function WorkoutBuilder({ existingWorkout, onSuccess }: WorkoutBuilderPro
         // Reset form for new workouts
         form.reset();
         setWeeks([]);
+        onSuccess?.();
       }
-
-      onSuccess?.();
     } catch (error) {
       toast({
         title: "Errore",
@@ -446,9 +452,13 @@ export function WorkoutBuilder({ existingWorkout, onSuccess }: WorkoutBuilderPro
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Button 
-                type="submit"
+                type="button"
                 disabled={createWorkout.isPending || updateWorkout.isPending}
                 className="flex-1 bg-gradient-primary hover:opacity-90 transition-opacity"
+                onClick={() => {
+                  const formData = form.getValues();
+                  onSubmit(formData);
+                }}
               >
                 <Save className="mr-2" size={16} />
                 {(createWorkout.isPending || updateWorkout.isPending) ? 'Salvando...' : (existingWorkout ? 'Aggiorna Scheda' : 'Salva Scheda')}

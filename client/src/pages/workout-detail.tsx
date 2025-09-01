@@ -131,47 +131,103 @@ export default function WorkoutDetail() {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-mobile-nav">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center space-x-4">
-          <Link href="/workouts">
-            <Button variant="ghost" size="sm" className="glass-effect">
-              <ArrowLeft size={16} className="mr-2" />
-              Indietro
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              {currentWorkout.clientName}
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {currentWorkout.workoutType} • {currentWorkout.duration} settimane • {timeAgo}
-            </p>
+      <div className="mb-8">
+        {/* Desktop Header */}
+        <div className="hidden md:flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link href="/workouts">
+              <Button variant="ghost" size="sm" className="glass-effect">
+                <ArrowLeft size={16} className="mr-2" />
+                Indietro
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                {currentWorkout.clientName}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {currentWorkout.workoutType} • {currentWorkout.duration} settimane • {timeAgo}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex space-x-2">
+            {isEditing ? (
+              <>
+                <Button onClick={handleSave} disabled={updateWorkout.isPending} className="bg-emerald-500 hover:bg-emerald-600">
+                  <Save size={16} className="mr-2" />
+                  Salva
+                </Button>
+                <Button onClick={handleCancel} variant="outline">
+                  Annulla
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button onClick={handleEdit} className="bg-indigo-500 hover:bg-indigo-600">
+                  <Edit size={16} className="mr-2" />
+                  Modifica
+                </Button>
+                <Button onClick={handleExportPDF} className="bg-orange-500 hover:bg-orange-600">
+                  <FileText size={16} className="mr-2" />
+                  Esporta PDF
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="flex space-x-2">
-          {isEditing ? (
-            <>
-              <Button onClick={handleSave} disabled={updateWorkout.isPending} className="bg-emerald-500 hover:bg-emerald-600">
-                <Save size={16} className="mr-2" />
-                Salva
+        {/* Mobile Header - Stack Layout */}
+        <div className="md:hidden space-y-4">
+          <div className="flex items-center justify-between">
+            <Link href="/workouts">
+              <Button variant="ghost" size="sm" className="glass-effect">
+                <ArrowLeft size={16} className="mr-2" />
+                Indietro
               </Button>
-              <Button onClick={handleCancel} variant="outline">
-                Annulla
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button onClick={handleEdit} className="bg-indigo-500 hover:bg-indigo-600">
-                <Edit size={16} className="mr-2" />
-                Modifica
-              </Button>
-              <Button onClick={handleExportPDF} className="bg-orange-500 hover:bg-orange-600">
-                <FileText size={16} className="mr-2" />
-                Esporta PDF
-              </Button>
-            </>
-          )}
+            </Link>
+          </div>
+          
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              {currentWorkout.clientName}
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              {currentWorkout.workoutType} • {currentWorkout.duration} settimane
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+              {timeAgo}
+            </p>
+          </div>
+
+          <div className="flex flex-col space-y-2">
+            {isEditing ? (
+              <>
+                <Button 
+                  onClick={handleSave} 
+                  disabled={updateWorkout.isPending} 
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 touch-action-manipulation"
+                >
+                  <Save size={16} className="mr-2" />
+                  Salva Modifiche
+                </Button>
+                <Button onClick={handleCancel} variant="outline" className="w-full touch-action-manipulation">
+                  Annulla
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button onClick={handleEdit} className="w-full bg-indigo-500 hover:bg-indigo-600 touch-action-manipulation">
+                  <Edit size={16} className="mr-2" />
+                  Modifica Scheda
+                </Button>
+                <Button onClick={handleExportPDF} className="w-full bg-orange-500 hover:bg-orange-600 touch-action-manipulation">
+                  <FileText size={16} className="mr-2" />
+                  Esporta PDF
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -189,7 +245,7 @@ export default function WorkoutDetail() {
               <Input
                 value={currentWorkout.coachName}
                 onChange={(e) => setEditedWorkout({ ...currentWorkout, coachName: e.target.value })}
-                className="glass-effect bg-white/50 dark:bg-gray-800/50"
+                className="glass-effect bg-white/50 dark:bg-gray-800/50 touch-action-manipulation min-h-[44px] md:min-h-0"
               />
             ) : (
               <p className="text-gray-900 dark:text-white">{currentWorkout.coachName}</p>
@@ -204,7 +260,7 @@ export default function WorkoutDetail() {
               <Input
                 value={currentWorkout.workoutType}
                 onChange={(e) => setEditedWorkout({ ...currentWorkout, workoutType: e.target.value })}
-                className="glass-effect bg-white/50 dark:bg-gray-800/50"
+                className="glass-effect bg-white/50 dark:bg-gray-800/50 touch-action-manipulation min-h-[44px] md:min-h-0"
               />
             ) : (
               <p className="text-gray-900 dark:text-white">{currentWorkout.workoutType}</p>
@@ -220,7 +276,7 @@ export default function WorkoutDetail() {
                 value={currentWorkout.description || ''}
                 onChange={(e) => setEditedWorkout({ ...currentWorkout, description: e.target.value })}
                 rows={3}
-                className="glass-effect bg-white/50 dark:bg-gray-800/50"
+                className="glass-effect bg-white/50 dark:bg-gray-800/50 touch-action-manipulation text-base"
               />
             ) : (
               <p className="text-gray-900 dark:text-white">{currentWorkout.description || 'Nessuna descrizione'}</p>
@@ -267,41 +323,85 @@ export default function WorkoutDetail() {
                       )}
 
                       {(day.exercises || []).length > 0 ? (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-gray-200 dark:border-gray-600">
-                                <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300">Esercizio</th>
-                                <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300">Serie</th>
-                                <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300">Reps</th>
-                                <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300">Carico</th>
-                                <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300">Recupero</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(day.exercises || []).map((exercise) => (
-                                <tr key={exercise.id} className="border-b border-gray-100 dark:border-gray-700">
-                                  <td className="py-2 px-2">
-                                    <div className="flex items-center space-x-2">
-                                      {exercise.imageUrl && (
-                                        <img 
-                                          src={exercise.imageUrl} 
-                                          alt="Exercise" 
-                                          className="w-8 h-8 object-cover rounded"
-                                        />
-                                      )}
-                                      <span className="text-gray-900 dark:text-white">{exercise.name}</span>
-                                    </div>
-                                  </td>
-                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">{exercise.sets}</td>
-                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">{exercise.reps}</td>
-                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">{exercise.load || '-'}</td>
-                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">{exercise.rest || '-'}</td>
+                        <>
+                          {/* Desktop Table View */}
+                          <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-sm table-fixed">
+                              <thead>
+                                <tr className="border-b border-gray-200 dark:border-gray-600">
+                                  <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300 w-1/2">Esercizio</th>
+                                  <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300 w-16">Serie</th>
+                                  <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300 w-20">Reps</th>
+                                  <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300 w-24">Carico</th>
+                                  <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300 w-28">Recupero</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                              </thead>
+                              <tbody>
+                                {(day.exercises || []).map((exercise) => (
+                                  <tr key={exercise.id} className="border-b border-gray-100 dark:border-gray-700">
+                                    <td className="py-2 px-2 align-top">
+                                      <div className="flex items-start space-x-2 min-w-0">
+                                        {exercise.imageUrl && (
+                                          <img 
+                                            src={exercise.imageUrl} 
+                                            alt="Exercise" 
+                                            className="w-8 h-8 object-cover rounded"
+                                          />
+                                        )}
+                                        <span className="text-gray-900 dark:text-white break-words whitespace-normal block min-w-0">{exercise.name}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-2 text-gray-700 dark:text-gray-300 break-words whitespace-normal align-top">{exercise.sets}</td>
+                                    <td className="py-2 px-2 text-gray-700 dark:text-gray-300 break-words whitespace-normal align-top">{exercise.reps}</td>
+                                    <td className="py-2 px-2 text-gray-700 dark:text-gray-300 break-words whitespace-normal align-top">{exercise.load || '-'}</td>
+                                    <td className="py-2 px-2 text-gray-700 dark:text-gray-300 break-words whitespace-normal align-top">{exercise.rest || '-'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Mobile Card View */}
+                          <div className="md:hidden space-y-3">
+                            {(day.exercises || []).map((exercise) => (
+                              <div key={exercise.id} className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 space-y-2 touch-action-manipulation">
+                                <div className="flex items-center space-x-2">
+                                  {exercise.imageUrl && (
+                                    <img 
+                                      src={exercise.imageUrl} 
+                                      alt="Exercise" 
+                                      className="w-10 h-10 object-cover rounded"
+                                    />
+                                  )}
+                                  <h5 className="font-medium text-gray-900 dark:text-white text-sm">{exercise.name}</h5>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs touch-action-manipulation">
+                                  <div className="touch-action-manipulation">
+                                    <span className="font-medium text-gray-600 dark:text-gray-400">Serie:</span>
+                                    <span className="ml-1 text-gray-900 dark:text-white">{exercise.sets}</span>
+                                  </div>
+                                  <div className="touch-action-manipulation">
+                                    <span className="font-medium text-gray-600 dark:text-gray-400">Reps:</span>
+                                    <span className="ml-1 text-gray-900 dark:text-white">{exercise.reps}</span>
+                                  </div>
+                                  <div className="touch-action-manipulation">
+                                    <span className="font-medium text-gray-600 dark:text-gray-400">Carico:</span>
+                                    <span className="ml-1 text-gray-900 dark:text-white">{exercise.load || '-'}</span>
+                                  </div>
+                                  <div className="touch-action-manipulation">
+                                    <span className="font-medium text-gray-600 dark:text-gray-400">Recupero:</span>
+                                    <span className="ml-1 text-gray-900 dark:text-white">{exercise.rest || '-'}</span>
+                                  </div>
+                                </div>
+                                {exercise.notes && (
+                                  <div className="pt-1 border-t border-gray-200 dark:border-gray-600 touch-action-manipulation">
+                                    <p className="text-xs text-gray-600 dark:text-gray-400">{exercise.notes}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </>
                       ) : (
                         <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
                           Nessun esercizio per questo giorno
@@ -328,7 +428,7 @@ export default function WorkoutDetail() {
                 value={currentWorkout.dietaryAdvice}
                 onChange={(e) => setEditedWorkout({ ...currentWorkout, dietaryAdvice: e.target.value })}
                 rows={4}
-                className="glass-effect bg-white/50 dark:bg-gray-800/50"
+                className="glass-effect bg-white/50 dark:bg-gray-800/50 touch-action-manipulation text-base"
               />
             ) : (
               <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">

@@ -166,6 +166,26 @@ All data validation uses Zod schemas defined in `shared/schema.ts` with automati
 - Removed glass effects from navbar on mobile for solid background
 - Hidden "Progressione Settimanale" title on mobile in workout builder
 
+**Enhanced PDF Customization & Weekly Management** (August 18, 2025)
+- Added customizable week names (default "SETTIMANA 1", etc.)
+- Logo now positioned above the title in PDF headers
+- Added flag to use workout name as title instead of "SCHEDA DI ALLENAMENTO"
+- Coach biography now displays under coach name in PDF exports
+- Updated weekSchema to include optional name field for custom week naming
+- Enhanced ExerciseForm component with editable week names
+- Added useWorkoutNameAsTitle setting in coach profile
+- Improved PDF header layout with centered logo positioning
+- Week names in workout builder now fully customizable by users
+
+**Mobile Optimization & UI Improvements** (August 18, 2025)
+- Added auto-refresh functionality after profile save for immediate visual feedback
+- Implemented mobile-responsive workout detail view with stacked layout
+- Created separate mobile card view for exercises (replaces overlapping table)
+- Enhanced mobile header with centered layout and full-width buttons
+- Removed "Installa l'App" section as requested by user
+- Optimized exercise display with grid layout for Serie/Reps/Carico/Recupero on mobile
+- Added proper spacing and typography for mobile viewing experience
+
 ## User Preferences
 
 - Language: Italian (UI text in Italian)

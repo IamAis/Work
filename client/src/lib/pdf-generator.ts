@@ -15,6 +15,12 @@ export class PDFGenerator {
   }
 
   async generateWorkoutPDF(workout: Workout, coachProfile?: CoachProfile | null, filename?: string): Promise<Blob> {
+    // Check if there are any exercises with glossary content
+    const hasGlossaryExercises = workout.weeks.some(week => 
+      week.days.some(day => 
+        day.exercises.some(exercise => exercise.glossaryContent)
+      )
+    );
     this.doc = new jsPDF();
     let yPosition = this.margin;
 
@@ -44,6 +50,12 @@ export class PDFGenerator {
     // Dietary advice
     if (workout.dietaryAdvice) {
       yPosition = this.addDietaryAdvice(workout.dietaryAdvice, yPosition, lineColor, textColor);
+      yPosition += 10;
+    }
+    
+    // Glossary exercises section
+    if (hasGlossaryExercises) {
+      yPosition = this.addGlossaryExercises(workout, yPosition, lineColor, textColor);
     }
 
     // Footer with coach contact info (includes optional small watermark)
@@ -70,35 +82,69 @@ export class PDFGenerator {
   }
 
   private addHeader(workout: Workout, yPosition: number, coachProfile?: CoachProfile | null, lineColor?: string, textColor?: string): number {
-    // Add logo if present
+    // Add logo if present - posizionato sopra il titolo
     if (coachProfile?.logo) {
       try {
-        this.doc.addImage(coachProfile.logo, 'JPEG', this.margin, yPosition, 25, 25);
+        // Logo centrato sopra il titolo
+        const logoSize = 30;
+        const logoX = (this.pageWidth - logoSize) / 2;
+        this.doc.addImage(coachProfile.logo, 'JPEG', logoX, yPosition, logoSize, logoSize);
+        yPosition += logoSize + 10; // Spazio dopo il logo
       } catch (error) {
         console.warn('Could not add logo to PDF:', error);
       }
     }
 
-    // Title
+    // Title - usa il nome della scheda se il flag è attivo
     this.doc.setFont('helvetica', 'bold');
     this.doc.setFontSize(24);
     const titleRgb = this.hexToRgb(textColor || '#4F46E5');
     this.doc.setTextColor(titleRgb.r, titleRgb.g, titleRgb.b);
-    this.doc.text('SCHEDA DI ALLENAMENTO', this.pageWidth / 2, yPosition + 10, { align: 'center' });
-    yPosition += 25;
+    
+    const title = (coachProfile?.useWorkoutNameAsTitle && workout.name) 
+      ? workout.name.toUpperCase() 
+      : 'SCHEDA DI ALLENAMENTO';
+    
+    // Ridimensiona dinamicamente il titolo se eccede la larghezza utile
+    const maxTitleWidth = this.pageWidth - 2 * this.margin;
+    let titleFontSize = 24;
+    this.doc.setFontSize(titleFontSize);
+    while (this.doc.getTextWidth(title) > maxTitleWidth && titleFontSize > 12) {
+      titleFontSize -= 1;
+      this.doc.setFontSize(titleFontSize);
+    }
+    this.doc.text(title, this.pageWidth / 2, yPosition + 10, { align: 'center' });
+    yPosition += 15 + Math.max(0, (24 - titleFontSize));
 
     // Subtitle
     this.doc.setFontSize(14);
     this.doc.setTextColor(0, 0, 0);
-    this.doc.text(`${workout.workoutType} - ${workout.duration} settimane`, this.pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 15;
+    const subtitle = `${workout.workoutType} - ${workout.duration} settimane`;
+    const subtitleMaxWidth = this.pageWidth - 2 * this.margin;
+    if (this.doc.getTextWidth(subtitle) > subtitleMaxWidth) {
+      const lines = this.doc.splitTextToSize(subtitle, subtitleMaxWidth);
+      this.doc.text(lines, this.pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += lines.length * 6 + 3;
+    } else {
+      this.doc.text(subtitle, this.pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 15;
+    }
 
     // Coach name if present
     if (coachProfile?.name) {
       this.doc.setFontSize(12);
       this.doc.setTextColor(100, 100, 100);
       this.doc.text(`Coach: ${coachProfile.name}`, this.pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 10;
+      yPosition += 8;
+    }
+
+    // Coach biography if present
+    if (coachProfile?.bio) {
+      this.doc.setFontSize(10);
+      this.doc.setTextColor(80, 80, 80);
+      const bioLines = this.doc.splitTextToSize(coachProfile.bio, this.pageWidth - 2 * this.margin);
+      this.doc.text(bioLines, this.pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += bioLines.length * 4 + 5;
     }
 
     // Line separator with custom color
@@ -128,18 +174,26 @@ export class PDFGenerator {
     this.doc.text('CLIENTE:', midPoint, yPosition);
     
     this.doc.setFont('helvetica', 'normal');
-    this.doc.text(workout.level || '', this.margin + 25, yPosition);
-    this.doc.text(workout.clientName, midPoint + 30, yPosition);
-    yPosition += 10;
+    const leftValX = this.margin + 25;
+    const rightValX = midPoint + 30;
+    const leftMaxW = midPoint - leftValX - 5;
+    const rightMaxW = (this.pageWidth - this.margin) - rightValX - 5;
+    const levelLines = this.doc.splitTextToSize(workout.level || '', Math.max(0, leftMaxW));
+    const clientLines = this.doc.splitTextToSize(workout.clientName || '', Math.max(0, rightMaxW));
+    this.doc.text(levelLines, leftValX, yPosition);
+    this.doc.text(clientLines, rightValX, yPosition);
+    yPosition += Math.max(levelLines.length, clientLines.length) * 5 + 2;
 
     this.doc.setFont('helvetica', 'bold');
     this.doc.text('TIPO:', this.margin, yPosition);
     this.doc.text('DURATA:', midPoint, yPosition);
     
     this.doc.setFont('helvetica', 'normal');
-    this.doc.text(workout.workoutType, this.margin + 25, yPosition);
-    this.doc.text(`${workout.duration} settimane`, midPoint + 30, yPosition);
-    yPosition += 10;
+    const typeLines = this.doc.splitTextToSize(workout.workoutType || '', Math.max(0, leftMaxW));
+    const durationLines = this.doc.splitTextToSize(`${workout.duration} settimane`, Math.max(0, rightMaxW));
+    this.doc.text(typeLines, leftValX, yPosition);
+    this.doc.text(durationLines, rightValX, yPosition);
+    yPosition += Math.max(typeLines.length, durationLines.length) * 5 + 2;
 
     return yPosition;
   }
@@ -164,130 +218,132 @@ export class PDFGenerator {
   }
 
   private addWeeklyProgression(workout: Workout, yPosition: number, lineColor?: string, textColor?: string): number {
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setFontSize(14);
-    const titleRgb = this.hexToRgb(textColor || '#4F46E5');
-    this.doc.setTextColor(titleRgb.r, titleRgb.g, titleRgb.b);
-    this.doc.text('PROGRESSIONE SETTIMANALE', this.margin, yPosition);
-    yPosition += 10;
+  this.doc.setFont('helvetica', 'bold');
+  this.doc.setFontSize(14);
+  const titleRgb = this.hexToRgb(textColor || '#4F46E5');
+  this.doc.setTextColor(titleRgb.r, titleRgb.g, titleRgb.b);
+  this.doc.text('PROGRESSIONE SETTIMANALE', this.margin, yPosition);
+  yPosition += 10;
 
-    for (const week of workout.weeks) {
-      // Check if we need a new page
-      if (yPosition > this.pageHeight - 80) {
+  for (const week of workout.weeks) {
+    if (yPosition > this.pageHeight - 80) {
+      this.doc.addPage();
+      yPosition = this.margin;
+    }
+
+    // Titolo settimana
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setFontSize(12);
+    this.doc.setTextColor(0, 0, 0);
+    const weekName = (week.name || `SETTIMANA ${week.number}`).toUpperCase();
+    this.doc.text(weekName, this.margin, yPosition);
+    yPosition += 8;
+
+    // Note settimana
+    if (week.notes) {
+      this.doc.setFont('helvetica', 'italic');
+      this.doc.setFontSize(9);
+      const noteLines = this.doc.splitTextToSize(week.notes, this.pageWidth - 2 * this.margin);
+      this.doc.text(noteLines, this.margin, yPosition);
+      yPosition += noteLines.length * 4;
+    }
+
+    // Giorni della settimana
+    for (const day of week.days) {
+      if (yPosition > this.pageHeight - 60) {
         this.doc.addPage();
         yPosition = this.margin;
       }
 
-      // Week header
+      // Titolo giorno
       this.doc.setFont('helvetica', 'bold');
-      this.doc.setFontSize(12);
-      this.doc.setTextColor(0, 0, 0);
-      this.doc.text(`SETTIMANA ${week.number}`, this.margin, yPosition);
-      yPosition += 8;
+      this.doc.setFontSize(11);
+      const dayTitleRgb = this.hexToRgb(textColor || '#4F46E5');
+      this.doc.setTextColor(dayTitleRgb.r, dayTitleRgb.g, dayTitleRgb.b);
+      this.doc.text(day.name || 'GIORNO', this.margin + 5, yPosition);
+      yPosition += 7;
 
-      // Week notes
-      if (week.notes) {
+      // Note giorno
+      if (day.notes) {
         this.doc.setFont('helvetica', 'italic');
-        this.doc.setFontSize(9);
-        const noteLines = this.doc.splitTextToSize(week.notes, this.pageWidth - 2 * this.margin);
-        this.doc.text(noteLines, this.margin, yPosition);
-        yPosition += noteLines.length * 4;
+        this.doc.setFontSize(8);
+        const dayNoteLines = this.doc.splitTextToSize(day.notes, this.pageWidth - 2 * this.margin);
+        this.doc.text(dayNoteLines, this.margin + 10, yPosition);
+        yPosition += dayNoteLines.length * 3;
       }
 
-      // Process each day in the week
-      for (const day of week.days) {
-        if (yPosition > this.pageHeight - 60) {
-          this.doc.addPage();
-          yPosition = this.margin;
-        }
+      if (day.exercises.length > 0) {
+        // Imposto dimensioni tabella
+        const colWidths = [65, 20, 20, 25, 30];
+        const headers = ['ESERCIZIO', 'SERIE', 'REPS', 'CARICO', 'RECUPERO'];
+        const startX = this.margin + 5;
+        let rowY = yPosition;
 
-        // Day header
+        // Header tabella
         this.doc.setFont('helvetica', 'bold');
-        this.doc.setFontSize(11);
-        const dayTitleRgb = this.hexToRgb(textColor || '#4F46E5');
-        this.doc.setTextColor(dayTitleRgb.r, dayTitleRgb.g, dayTitleRgb.b);
-        this.doc.text(day.name, this.margin + 5, yPosition);
-        yPosition += 8;
+        this.doc.setFontSize(8);
+        this.doc.setTextColor(0, 0, 0);
 
-        // Day notes
-        if (day.notes) {
-          this.doc.setFont('helvetica', 'italic');
-          this.doc.setFontSize(8);
-          const dayNoteLines = this.doc.splitTextToSize(day.notes, this.pageWidth - 2 * this.margin - 10);
-          this.doc.text(dayNoteLines, this.margin + 10, yPosition);
-          yPosition += dayNoteLines.length * 3;
-        }
+        let x = startX;
+        headers.forEach((h, i) => {
+          this.doc.setLineWidth(0.5); // più spesso (0.2 default, 0.5 medio, 1 molto spesso)
+          this.doc.text(h, x + 2, rowY + 4);
+          this.doc.rect(x, rowY, colWidths[i], 6);
+          x += colWidths[i];
+        });
+        rowY += 6;
 
-        if (day.exercises.length > 0) {
-          // Exercise table headers
-          this.doc.setFont('helvetica', 'bold');
-          this.doc.setFontSize(8);
-          this.doc.setTextColor(0, 0, 0);
-          this.doc.text('ESERCIZIO', this.margin + 10, yPosition);
-          this.doc.text('SERIE', this.margin + 70, yPosition);
-          this.doc.text('REPS', this.margin + 95, yPosition);
-          this.doc.text('CARICO', this.margin + 120, yPosition);
-          this.doc.text('RECUPERO', this.margin + 150, yPosition);
-          yPosition += 5;
+        // Righe esercizi
+        this.doc.setFont('helvetica', 'normal');
+        this.doc.setFontSize(8);
 
-          // Line under headers with custom color
-          if (lineColor) {
-            const rgb = this.hexToRgb(lineColor);
-            this.doc.setDrawColor(rgb.r, rgb.g, rgb.b);
-          } else {
-            this.doc.setDrawColor(200, 200, 200);
+        for (const exercise of day.exercises) {
+          // Controllo spazio pagina
+          if (rowY > this.pageHeight - 40) {
+            this.doc.addPage();
+            rowY = this.margin;
           }
-          this.doc.setLineWidth(0.3);
-          this.doc.line(this.margin + 10, yPosition, this.pageWidth - this.margin - 10, yPosition);
-          yPosition += 3;
 
-          // Exercises
-          this.doc.setFont('helvetica', 'normal');
-          for (const exercise of day.exercises) {
-            if (yPosition > this.pageHeight - 30) {
-              this.doc.addPage();
-              yPosition = this.margin;
-            }
+          const rowValues = [
+            exercise.name || '',
+            exercise.sets || '',
+            exercise.reps || '',
+            exercise.load || '',
+            exercise.rest || ''
+          ];
 
-            // Add exercise image if present
-            if (exercise.imageUrl) {
-              try {
-                // Add image to PDF (small thumbnail)
-                this.doc.addImage(exercise.imageUrl, 'JPEG', this.margin + 5, yPosition - 3, 8, 8);
-              } catch (error) {
-                console.warn('Could not add exercise image to PDF:', error);
-              }
-            }
+          x = startX;
+          rowValues.forEach((val, i) => {
+            const wrapped = this.doc.splitTextToSize(val, colWidths[i] - 4);
+            this.doc.text(wrapped, x + 2, rowY + 4);
+            this.doc.rect(x, rowY, colWidths[i], 8);
+            x += colWidths[i];
+          });
 
-            // Exercise data
-            this.doc.text(exercise.name || '', this.margin + (exercise.imageUrl ? 18 : 10), yPosition);
-            this.doc.text(exercise.sets || '', this.margin + 70, yPosition);
-            this.doc.text(exercise.reps || '', this.margin + 95, yPosition);
-            this.doc.text(exercise.load || '', this.margin + 120, yPosition);
-            this.doc.text(exercise.rest || '', this.margin + 150, yPosition);
-            yPosition += 5;
+          rowY += 8;
 
-            // Exercise notes
-            if (exercise.notes) {
-              this.doc.setFont('helvetica', 'italic');
-              this.doc.setFontSize(7);
-              const noteLines = this.doc.splitTextToSize(`Note: ${exercise.notes}`, this.pageWidth - 2 * this.margin - 20);
-              this.doc.text(noteLines, this.margin + 15, yPosition);
-              yPosition += noteLines.length * 3;
-              this.doc.setFont('helvetica', 'normal');
-              this.doc.setFontSize(8);
-            }
+          // Note esercizio sotto la riga
+          if (exercise.notes) {
+            const noteLines = this.doc.splitTextToSize(`Note: ${exercise.notes}`, this.pageWidth - 2 * this.margin);
+            this.doc.setFont('helvetica', 'italic');
+            this.doc.setFontSize(7);
+            this.doc.text(noteLines, startX, rowY + 3);
+            rowY += noteLines.length * 3 + 2;
+            this.doc.setFont('helvetica', 'normal');
+            this.doc.setFontSize(8);
           }
         }
-        
-        yPosition += 8; // Space after each day
+
+        yPosition = rowY + 10;
       }
-
-      yPosition += 5; // Space after each week
     }
 
-    return yPosition;
+    yPosition += 5; // Spazio dopo ogni settimana
   }
+
+  return yPosition;
+}
+
 
   private addDietaryAdvice(advice: string, yPosition: number, lineColor?: string, textColor?: string): number {
     if (yPosition > this.pageHeight - 60) {
@@ -360,7 +416,119 @@ export class PDFGenerator {
     this.doc.text(new Date().toLocaleDateString('it-IT'), this.pageWidth - this.margin, footerY + 10, { align: 'right' });
   }
 
+  // Tronca il testo aggiungendo un'ellissi se supera la larghezza massima
+  private fitText(text: string, maxWidth: number): string {
+    if (!text) return '';
+    if (this.doc.getTextWidth(text) <= maxWidth) return text;
+    const ellipsis = '…';
+    let start = 0;
+    let end = text.length;
+    let best = '';
+    // Binary search per trovare la lunghezza massima che entra
+    while (start <= end) {
+      const mid = Math.floor((start + end) / 2);
+      const candidate = text.slice(0, mid) + ellipsis;
+      if (this.doc.getTextWidth(candidate) <= maxWidth) {
+        best = candidate;
+        start = mid + 1;
+      } else {
+        end = mid - 1;
+      }
+    }
+    return best || ellipsis;
+  }
 
+  private addGlossaryExercises(workout: Workout, yPosition: number, lineColor?: string, textColor?: string): number {
+    // Check if we need a new page
+    if (yPosition > this.pageHeight - 60) {
+      this.doc.addPage();
+      yPosition = this.margin;
+    }
+
+    // Title for glossary section
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setFontSize(14);
+    const titleRgb = this.hexToRgb(textColor || '#4F46E5');
+    this.doc.setTextColor(titleRgb.r, titleRgb.g, titleRgb.b);
+    this.doc.text('GLOSSARIO ESERCIZI', this.margin, yPosition);
+    yPosition += 8;
+
+    // Reset text color
+    this.doc.setTextColor(0, 0, 0);
+    
+    // Collect all exercises with glossary content
+    const glossaryExercises = [];
+    workout.weeks.forEach(week => {
+      week.days.forEach(day => {
+        day.exercises.forEach(exercise => {
+          if (exercise.glossaryContent && !glossaryExercises.some(e => e.name === exercise.name)) {
+            glossaryExercises.push(exercise);
+          }
+        });
+      });
+    });
+
+    // If no exercises with glossary content, return
+    if (glossaryExercises.length === 0) {
+      return yPosition;
+    }
+
+    // Add each exercise from glossary
+    for (const exercise of glossaryExercises) {
+      // Exercise name
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setFontSize(12);
+      this.doc.text(exercise.name, this.margin, yPosition);
+      yPosition += 6;
+
+      // Exercise description
+      if (exercise.glossaryContent?.description) {
+        this.doc.setFont('helvetica', 'normal');
+        this.doc.setFontSize(10);
+        const descLines = this.doc.splitTextToSize(
+          exercise.glossaryContent.description,
+          this.pageWidth - 2 * this.margin
+        );
+        this.doc.text(descLines, this.margin, yPosition);
+        yPosition += descLines.length * 5 + 5;
+      }
+
+      // Exercise images
+      if (exercise.glossaryContent?.images && exercise.glossaryContent.images.length > 0) {
+        for (const imageUrl of exercise.glossaryContent.images) {
+          try {
+            // Check if we need a new page for the image
+            if (yPosition > this.pageHeight - 60) {
+              this.doc.addPage();
+              yPosition = this.margin;
+            }
+
+            // Add image
+            const imgWidth = 80;
+            const imgHeight = 60;
+            this.doc.addImage(imageUrl, 'JPEG', this.margin, yPosition, imgWidth, imgHeight);
+            yPosition += imgHeight + 10;
+          } catch (error) {
+            console.warn(`Could not add image for exercise ${exercise.name}:`, error);
+          }
+        }
+      }
+
+      // Add separator line
+      this.doc.setDrawColor(200, 200, 200);
+      this.doc.setLineWidth(0.5);
+      this.doc.line(this.margin, yPosition, this.pageWidth - this.margin, yPosition);
+      yPosition += 10;
+
+      // Check if we need a new page for the next exercise
+      if (yPosition > this.pageHeight - 60) {
+        this.doc.addPage();
+        yPosition = this.margin;
+      }
+    }
+
+    return yPosition;
+  }
 
   private hexToRgb(hex: string): { r: number; g: number; b: number } {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
